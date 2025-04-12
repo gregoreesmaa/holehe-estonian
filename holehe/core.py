@@ -34,16 +34,20 @@ EMAIL_FORMAT = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
 __version__ = "1.61"
 
 
-def import_submodules(package, recursive=True):
+def import_submodules(package, incl_package, recursive=True):
     """Get all the holehe submodules"""
     if isinstance(package, str):
         package = importlib.import_module(package)
     results = {}
     for loader, name, is_pkg in pkgutil.walk_packages(package.__path__):
         full_name = package.__name__ + '.' + name
+        if incl_package is not None and not full_name.startswith(incl_package):
+            print("Ignoring", full_name, "as it is under", incl_package)
+            continue
         results[full_name] = importlib.import_module(full_name)
         if recursive and is_pkg:
-            results.update(import_submodules(full_name))
+            results.update(import_submodules(full_name, incl_package))
+        print("[*] Importing module " + full_name)
     return results
 
 
@@ -193,6 +197,8 @@ async def maincore():
                     help="Create a CSV with the results")
     parser.add_argument("-T","--timeout", type=int , default=10, required=False,dest="timeout",
                     help="Set max timeout value (default 10)")
+    parser.add_argument("-P", "--package", default=None, required=False, dest="package",
+                        help="Only check sites in a specific package")
 
     check_update()
     args = parser.parse_args()
@@ -203,7 +209,7 @@ async def maincore():
         exit("[-] Please enter a target email ! \nExample : holehe email@example.com")
 
     # Import Modules
-    modules = import_submodules("holehe.modules")
+    modules = import_submodules("holehe.modules", "holehe.modules." + args.package)
     websites = get_functions(modules,args)
     # Get timeout
     timeout=args.timeout
